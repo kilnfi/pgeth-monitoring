@@ -16,6 +16,7 @@ import (
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/pgeth"
 	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/redis/go-redis/v9"
 )
 
 type MonitoringEngine struct {
@@ -30,14 +31,18 @@ type MonitoringEngine struct {
 	latestBlock *types.Block
 
 	errChan chan error
+
+	rdb *redis.Client
 }
 
-func NewMonitoringEngine(pt *pgeth.PluginToolkit, cfg interface{}, errChan chan error) *MonitoringEngine {
+func NewMonitoringEngine(pt *pgeth.PluginToolkit, rdb *redis.Client, errChan chan error) *MonitoringEngine {
+
 	return &MonitoringEngine{
 		ptk:         pt,
 		backend:     pt.Backend.(*eth.EthAPIBackend),
 		chainConfig: pt.Backend.ChainConfig(),
 		errChan:     errChan,
+		rdb:         rdb,
 	}
 }
 
@@ -564,7 +569,12 @@ func (me *MonitoringEngine) Start(ctx context.Context) {
 }
 
 func Start(pt *pgeth.PluginToolkit, cfg interface{}, ctx context.Context, errChan chan error) {
-	me := NewMonitoringEngine(pt, cfg, errChan)
+	rdb := redis.NewClient(&redis.Options{
+		Addr:     "localhost:6379",
+		Password: "", // no password set
+		DB:       0,  // use default DB
+	})
+	me := NewMonitoringEngine(pt, rdb, errChan)
 
 	me.Start(ctx)
 
