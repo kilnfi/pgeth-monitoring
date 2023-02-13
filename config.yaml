@@ -1,0 +1,4 @@
+name: "monitoring"
+config:
+  field: "value"
+  amount: 123
