@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/big"
 	"strings"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus/misc"
@@ -441,7 +442,7 @@ func callTypeToPrefix(c *Call) string {
 	case "delegatecall":
 		return "D"
 	case "initial_call":
-		return "I"
+		return "C"
 	}
 	return "X"
 }
@@ -469,7 +470,7 @@ func encodeActionCalls(a Action) string {
 	return res
 }
 
-func (me *MonitoringEngine) encodeAndBroadcastCallTrace(at *AnalyzedTransaction, channel string) {
+func (me *MonitoringEngine) encodeAndBroadcastCallTrace(ctx context.Context, at *AnalyzedTransaction, channel string) {
 	var topic string
 	if at.Transaction.To() == nil {
 		topic = fmt.Sprintf("/%s/tx/%s/%s/null/%s", channel, at.Transaction.Hash(), at.From, encodeActionCalls(at.Traces))
@@ -478,12 +479,20 @@ func (me *MonitoringEngine) encodeAndBroadcastCallTrace(at *AnalyzedTransaction,
 
 	}
 
-	println(topic)
+	err := me.rdb.Publish(ctx, topic, "OK").Err()
+	if err != nil {
+		me.errChan <- err
+	}
+
+	err = me.rdb.Expire(ctx, topic, 1*time.Hour).Err()
+	if err != nil {
+		me.errChan <- err
+	}
 }
 
-func (me *MonitoringEngine) encodeAndBroadcast(ats []AnalyzedTransaction, channel string) {
+func (me *MonitoringEngine) encodeAndBroadcast(ctx context.Context, ats []AnalyzedTransaction, channel string) {
 	for _, analyzedTx := range ats {
-		me.encodeAndBroadcastCallTrace(&analyzedTx, channel)
+		me.encodeAndBroadcastCallTrace(ctx, &analyzedTx, channel)
 	}
 }
 
@@ -537,7 +546,8 @@ func (me *MonitoringEngine) analyze(ctx context.Context, block *types.Block) {
 		mt.Clear()
 	}
 	me.ptk.Logger.Info("Simulated txs", "count", len(block.Transactions()))
-	me.encodeAndBroadcast(analyzedTransactions, "head")
+	me.encodeAndBroadcast(ctx, analyzedTransactions, "head")
+	me.ptk.Logger.Info("Broadcasted txs", "count", len(block.Transactions()))
 	me.latestBlock = block
 }
 
