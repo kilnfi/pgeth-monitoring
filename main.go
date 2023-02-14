@@ -240,6 +240,8 @@ func (m *MonitoringTracer) CaptureTxEnd(restGas uint64) {
 
 }
 func (m *MonitoringTracer) CaptureStart(env *vm.EVM, from common.Address, to common.Address, create bool, input []byte, gas uint64, value *big.Int) {
+	copyInput := make([]byte, len(input))
+	copy(copyInput, input)
 	m.action = &Call{
 		callType: "initial_call",
 		children: []Action{},
@@ -254,13 +256,16 @@ func (m *MonitoringTracer) CaptureStart(env *vm.EVM, from common.Address, to com
 
 		from:  from,
 		to:    to,
-		in:    input,
+		in:    copyInput,
 		value: value,
 	}
 	m.cursor = m.action
 }
 
 func (m *MonitoringTracer) CaptureEnd(output []byte, gasUsed uint64, err error) {
+	copyOutput := make([]byte, len(output))
+	copy(copyOutput, output)
+	m.cursor.(*Call).out = copyOutput
 }
 
 func callOpcodeToString(c vm.OpCode) string {
@@ -291,6 +296,8 @@ func (m *MonitoringTracer) CaptureEnter(typ vm.OpCode, from common.Address, to c
 	if callType == "delegatecall" {
 		forwardedContext = from
 	}
+	copyInput := make([]byte, len(input))
+	copy(copyInput, input)
 	call := &Call{
 		callType: callType,
 		children: []Action{},
@@ -303,7 +310,7 @@ func (m *MonitoringTracer) CaptureEnter(typ vm.OpCode, from common.Address, to c
 		code:             code,
 		from:             from,
 		to:               to,
-		in:               input,
+		in:               copyInput,
 		value:            value,
 	}
 	m.cursor.AddChildren(call)
@@ -311,7 +318,9 @@ func (m *MonitoringTracer) CaptureEnter(typ vm.OpCode, from common.Address, to c
 }
 
 func (m *MonitoringTracer) CaptureExit(output []byte, gasUsed uint64, err error) {
-	m.cursor.(*Call).out = output
+	copyOutput := make([]byte, len(output))
+	copy(copyOutput, output)
+	m.cursor.(*Call).out = copyOutput
 	m.cursor = m.cursor.Parent()
 }
 
@@ -447,11 +456,27 @@ func callTypeToPrefix(c *Call) string {
 	return "X"
 }
 
+func minInt(a int, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+func encodeSelector(c *Call) string {
+	selector := fmt.Sprintf("%x", c.in[0:minInt(4, len(c.in))])
+	for len(selector) < 8 {
+		selector += "X"
+	}
+	return selector
+}
+
 func encodeActionCalls(a Action) string {
 	res := ""
 	if c, ok := a.(*Call); ok {
 		prefix := callTypeToPrefix(c)
-		res = fmt.Sprintf("%s@%s", prefix, c.to.String())
+		selector := encodeSelector(c)
+		res = fmt.Sprintf("%s@%s_%s", prefix, c.to.String(), selector)
 		if len(a.Children()) > 0 {
 			chldArr := []string{}
 			for _, chld := range a.Children() {
@@ -578,9 +603,23 @@ func (me *MonitoringEngine) Start(ctx context.Context) {
 	me.startHeadListener(ctx)
 }
 
-func Start(pt *pgeth.PluginToolkit, cfg interface{}, ctx context.Context, errChan chan error) {
+func Start(pt *pgeth.PluginToolkit, cfg map[string]interface{}, ctx context.Context, errChan chan error) {
+	var redisEndpointRaw interface{}
+	var redisEndpoint string
+	var ok bool
+
+	if redisEndpointRaw, ok = cfg["REDIS_ENDPOINT"]; !ok {
+		pt.Logger.Error("missing REDIS_ENDPOINT config var")
+		return
+	}
+
+	if redisEndpoint, ok = redisEndpointRaw.(string); !ok {
+		pt.Logger.Error("invalid REDIS_ENDPOINT value")
+		return
+	}
+
 	rdb := redis.NewClient(&redis.Options{
-		Addr:     "localhost:6379",
+		Addr:     redisEndpoint,
 		Password: "", // no password set
 		DB:       0,  // use default DB
 	})
