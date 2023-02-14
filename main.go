@@ -433,7 +433,7 @@ func (me *MonitoringEngine) update(ctx context.Context, parent *types.Block) {
 		ParentHash: parent.Hash(),
 		Number:     new(big.Int).Add(parent.Number(), common.Big1),
 		GasLimit:   parent.GasLimit(),
-		Time:       parent.Time() + 1,
+		Time:       parent.Time() + 12,
 		Coinbase:   parent.Coinbase(),
 		BaseFee:    misc.CalcBaseFee(me.chainConfig, parent.Header()),
 		Difficulty: parent.Difficulty(),
@@ -576,16 +576,67 @@ func (me *MonitoringEngine) analyze(ctx context.Context, block *types.Block) {
 	me.latestBlock = block
 }
 
+func (me *MonitoringEngine) analyzePending(ctx context.Context, txs []*types.Transaction) {
+	// simulate all block here
+	if me.header == nil {
+		me.ptk.Logger.Warn("Skipping pending tx simulation, not ready")
+		return
+	}
+	gp := new(core.GasPool).AddGas(me.header.GasLimit)
+	mt := MonitoringTracer{}
+	var vmConfig vm.Config = vm.Config{
+		Debug:                   true,
+		Tracer:                  &mt,
+		NoBaseFee:               false,
+		EnablePreimageRecording: false,
+		ExtraEips:               []int{},
+	}
+	analyzedTransactions := []AnalyzedTransaction{}
+	for _, tx := range txs {
+		receipt, err := core.ApplyTransaction(me.chainConfig, me.backend.Ethereum().BlockChain(), &me.header.Coinbase, gp, me.state, me.header, tx, &me.header.GasUsed, vmConfig)
+		if err != nil {
+			continue
+		}
+		signer := types.MakeSigner(me.backend.Ethereum().BlockChain().Config(), receipt.BlockNumber)
+		msg, err := tx.AsMessage(signer, nil)
+		if err != nil {
+			me.errChan <- err
+			return
+		}
+		analyzedTransactions = append(analyzedTransactions, AnalyzedTransaction{
+			Transaction: tx,
+			From:        msg.From(),
+			Receipt:     receipt,
+			Traces:      mt.action,
+		})
+		mt.Clear()
+	}
+	if len(analyzedTransactions) > 0 {
+		me.encodeAndBroadcast(ctx, analyzedTransactions, "pending")
+	}
+}
+
 func (me *MonitoringEngine) startHeadListener(ctx context.Context) {
 	headChan := make(chan core.ChainHeadEvent)
-	subscription := me.backend.SubscribeChainHeadEvent(headChan)
+	headSubscription := me.backend.SubscribeChainHeadEvent(headChan)
+	pendingChan := make(chan core.NewTxsEvent)
+	pendingSubscription := me.backend.SubscribeNewTxsEvent(pendingChan)
 	for {
 		select {
 		case <-ctx.Done():
-			subscription.Unsubscribe()
+			headSubscription.Unsubscribe()
+			pendingSubscription.Unsubscribe()
 			return
-		case err := <-subscription.Err():
-			subscription.Unsubscribe()
+		case err := <-headSubscription.Err():
+			headSubscription.Unsubscribe()
+			pendingSubscription.Unsubscribe()
+			if err != nil {
+				me.errChan <- err
+			}
+			return
+		case err := <-pendingSubscription.Err():
+			headSubscription.Unsubscribe()
+			pendingSubscription.Unsubscribe()
 			if err != nil {
 				me.errChan <- err
 			}
@@ -595,6 +646,8 @@ func (me *MonitoringEngine) startHeadListener(ctx context.Context) {
 			me.ptk.Logger.Info("Head was updated", "number", newHead.Block.NumberU64(), "hash", newHead.Block.Hash(), "root", newHead.Block.Root())
 
 			me.analyze(ctx, newHead.Block)
+		case newTxs := <-pendingChan:
+			me.analyzePending(ctx, newTxs.Txs)
 		}
 	}
 }
