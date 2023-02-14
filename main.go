@@ -621,22 +621,23 @@ func (me *MonitoringEngine) startHeadListener(ctx context.Context) {
 	headSubscription := me.backend.SubscribeChainHeadEvent(headChan)
 	pendingChan := make(chan core.NewTxsEvent)
 	pendingSubscription := me.backend.SubscribeNewTxsEvent(pendingChan)
+	ticker := time.NewTicker(30 * time.Second)
+	analyzedPendingTxs := 0
+
+	defer headSubscription.Unsubscribe()
+	defer pendingSubscription.Unsubscribe()
+	defer ticker.Stop()
+
 	for {
 		select {
 		case <-ctx.Done():
-			headSubscription.Unsubscribe()
-			pendingSubscription.Unsubscribe()
 			return
 		case err := <-headSubscription.Err():
-			headSubscription.Unsubscribe()
-			pendingSubscription.Unsubscribe()
 			if err != nil {
 				me.errChan <- err
 			}
 			return
 		case err := <-pendingSubscription.Err():
-			headSubscription.Unsubscribe()
-			pendingSubscription.Unsubscribe()
 			if err != nil {
 				me.errChan <- err
 			}
@@ -648,6 +649,12 @@ func (me *MonitoringEngine) startHeadListener(ctx context.Context) {
 			me.analyze(ctx, newHead.Block)
 		case newTxs := <-pendingChan:
 			me.analyzePending(ctx, newTxs.Txs)
+			analyzedPendingTxs += len(newTxs.Txs)
+		case <-ticker.C:
+			if analyzedPendingTxs > 0 {
+				me.ptk.Logger.Info("Analyzed pending txs", "count", analyzedPendingTxs, "rate", fmt.Sprintf("%f/s", float64(analyzedPendingTxs)/float64(30)))
+				analyzedPendingTxs = 0
+			}
 		}
 	}
 }
