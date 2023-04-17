@@ -543,7 +543,6 @@ func (me *MonitoringEngine) analyze(ctx context.Context, block *types.Block) {
 	gp := new(core.GasPool).AddGas(block.Header().GasLimit)
 	mt := MonitoringTracer{}
 	var vmConfig vm.Config = vm.Config{
-		Debug:                   true,
 		Tracer:                  &mt,
 		NoBaseFee:               false,
 		EnablePreimageRecording: false,
@@ -557,14 +556,10 @@ func (me *MonitoringEngine) analyze(ctx context.Context, block *types.Block) {
 			return
 		}
 		signer := types.MakeSigner(me.backend.Ethereum().BlockChain().Config(), receipt.BlockNumber)
-		msg, err := tx.AsMessage(signer, nil)
-		if err != nil {
-			me.errChan <- err
-			return
-		}
+		from, _ := types.Sender(signer, tx)
 		analyzedTransactions = append(analyzedTransactions, AnalyzedTransaction{
 			Transaction: tx,
-			From:        msg.From(),
+			From:        from,
 			Receipt:     receipt,
 			Traces:      mt.action,
 		})
@@ -578,14 +573,9 @@ func (me *MonitoringEngine) analyze(ctx context.Context, block *types.Block) {
 
 func (me *MonitoringEngine) analyzePending(ctx context.Context, txs []*types.Transaction) {
 	// simulate all block here
-	if me.header == nil {
-		me.ptk.Logger.Warn("Skipping pending tx simulation, not ready")
-		return
-	}
 	gp := new(core.GasPool).AddGas(me.header.GasLimit)
 	mt := MonitoringTracer{}
 	var vmConfig vm.Config = vm.Config{
-		Debug:                   true,
 		Tracer:                  &mt,
 		NoBaseFee:               false,
 		EnablePreimageRecording: false,
@@ -598,14 +588,10 @@ func (me *MonitoringEngine) analyzePending(ctx context.Context, txs []*types.Tra
 			continue
 		}
 		signer := types.MakeSigner(me.backend.Ethereum().BlockChain().Config(), receipt.BlockNumber)
-		msg, err := tx.AsMessage(signer, nil)
-		if err != nil {
-			me.errChan <- err
-			return
-		}
+		from, _ := types.Sender(signer, tx)
 		analyzedTransactions = append(analyzedTransactions, AnalyzedTransaction{
 			Transaction: tx,
-			From:        msg.From(),
+			From:        from,
 			Receipt:     receipt,
 			Traces:      mt.action,
 		})
@@ -648,8 +634,12 @@ func (me *MonitoringEngine) startHeadListener(ctx context.Context) {
 
 			me.analyze(ctx, newHead.Block)
 		case newTxs := <-pendingChan:
-			me.analyzePending(ctx, newTxs.Txs)
-			analyzedPendingTxs += len(newTxs.Txs)
+			if me.header == nil {
+				me.ptk.Logger.Warn("Skipping pending tx simulation, not ready")
+			} else {
+				me.analyzePending(ctx, newTxs.Txs)
+				analyzedPendingTxs += len(newTxs.Txs)
+			}
 		case <-ticker.C:
 			if analyzedPendingTxs > 0 {
 				me.ptk.Logger.Info("Analyzed pending txs", "count", analyzedPendingTxs, "rate", fmt.Sprintf("%f/s", float64(analyzedPendingTxs)/float64(30)))
@@ -680,8 +670,8 @@ func Start(pt *pgeth.PluginToolkit, cfg map[string]interface{}, ctx context.Cont
 
 	rdb := redis.NewClient(&redis.Options{
 		Addr:     redisEndpoint,
-		Password: "", // no password set
-		DB:       0,  // use default DB
+		Password: "",
+		DB:       0,
 	})
 	me := NewMonitoringEngine(pt, rdb, errChan)
 
