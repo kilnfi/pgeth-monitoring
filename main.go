@@ -321,6 +321,7 @@ func (me *MonitoringEngine) startHeadListener(ctx context.Context) {
 			res, err := me.eth2.(eth2client.SignedBeaconBlockProvider).SignedBeaconBlock(ctx, "finalized")
 			if err != nil {
 				me.errChan <- err
+				continue
 			}
 
 			newHighestFinalized := res.Capella.Message.Body.ExecutionPayload.BlockNumber
@@ -329,16 +330,26 @@ func (me *MonitoringEngine) startHeadListener(ctx context.Context) {
 				me.ptk.Logger.Info("Finalized head was updated", "number", highestFinalized)
 			} else if newHighestFinalized > highestFinalized {
 				me.ptk.Logger.Info("Updating finalized head", "from", highestFinalized, "to", newHighestFinalized)
+				breaked := false
 				for i := highestFinalized + 1; i <= newHighestFinalized; i++ {
 					blk, err := me.backend.BlockByNumber(ctx, rpc.BlockNumber(i))
+					if err != nil {
+						me.errChan <- err
+						breaked = true
+						break
+					}
+					if blk == nil {
+						breaked = true
+						break
+					}
 					if cachedValue, ok := cache[blk.Hash()]; ok {
 						me.encodeAndBroadcast(ctx, cachedValue.AnalyzedTransactions, "finalized")
 						me.ptk.Logger.Info("Broadcasted txs", "count", len(cachedValue.AnalyzedTransactions), "scope", "finalized", "number", i)
 						delete(cache, blk.Hash())
 					}
-					if err != nil {
-						me.errChan <- err
-					}
+				}
+				if breaked {
+					continue
 				}
 				me.ptk.Logger.Info("Finalized head was updated", "number", newHighestFinalized)
 				highestFinalized = newHighestFinalized
