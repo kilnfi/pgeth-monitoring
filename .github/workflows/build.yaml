@@ -36,4 +36,3 @@ jobs:
         run: |
           docker push ghcr.io/kilnfi/pgeth-monitoring:latest
           docker push ghcr.io/kilnfi/pgeth-monitoring:${GITHUB_SHA}
-          docker push ghcr.io/kilnfi/pgeth-monitoring:${BUILD_ID}
