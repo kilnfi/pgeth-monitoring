@@ -20,7 +20,7 @@ import (
 	"github.com/ethereum/go-ethereum/eth"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/pgeth"
-	"github.com/ethereum/go-ethereum/plugins/monitoring/pkg/tracer"
+	"github.com/ethereum/go-ethereum/plugins/pgeth-monitoring/pkg/tracer"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/redis/go-redis/v9"
 	"github.com/rs/zerolog"
