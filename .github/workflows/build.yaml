@@ -16,3 +16,31 @@ jobs:
         run: git clone https://github.com/mortimr/pgeth /tmp/pgeth
       - name: "build docker image with embedded plugin"
         run: cd /tmp/pgeth && docker build -f ./Dockerfile.plugins . --build-arg PLUGIN_REPOSITORIES="https://github.com/mortimr/pgeth-monitoring"
+      - name: "generate:build_id"
+        run: |
+          branch=${GITHUB_REF##*/}
+          sha=${GITHUB_SHA::8}
+          ts=$(date +%s)
+          echo "BUILD_ID=${branch}-${sha}-${ts}" >> $GITHUB_ENV
+        if: github.ref == 'refs/heads/pgeth' && github.event_name == 'push'
+
+      - name: "generate:build_id:pr"
+        run: |
+          echo "BUILD_ID=pr-${{ github.event.number }}-$GITHUB_RUN_ID" >> $GITHUB_ENV
+        if: github.event_name == 'pull_request'
+
+      - name: "build the docker image to ensure project still builds"
+        run: docker build .  -f Dockerfile.plugins --tag "ghcr.io/kilnfi/pgeth-monitoring:latest" --tag "ghcr.io/kilnfi/pgeth-monitoring:${GITHUB_SHA}" --tag "ghcr.io/kilnfi/pgeth-monitoring:${BUILD_ID}" --build-arg PLUGIN_REPOSITORIES="https://github.com/kilnfi/pgeth-monitoring"
+
+      - name: "login to ghcr"
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: "push to ghcr"
+        run: |
+          docker push ghcr.io/kilnfi/pgeth-monitoring:latest
+          docker push ghcr.io/kilnfi/pgeth-monitoring:${GITHUB_SHA}
+          docker push ghcr.io/kilnfi/pgeth-monitoring:${BUILD_ID}
