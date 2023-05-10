@@ -23,7 +23,7 @@ jobs:
           sha=${GITHUB_SHA::8}
           ts=$(date +%s)
           echo "BUILD_ID=${branch}-${sha}-${ts}" >> $GITHUB_ENV
-        if: github.ref == 'refs/heads/pgeth' && github.event_name == 'push'
+        if: github.event_name == 'push'
 
       - name: "build the docker image with PLUGIN_REPOSITORIES=https://github.com/kilnfi/pgeth-monitoring"
         run: cd /tmp/pgeth && docker build .  -f Dockerfile.plugins --tag "ghcr.io/kilnfi/pgeth-monitoring:${{ env.BUILD_ID }}" --tag "ghcr.io/kilnfi/pgeth-monitoring:latest" --tag "ghcr.io/kilnfi/pgeth-monitoring:${GITHUB_SHA}" --build-arg PLUGIN_REPOSITORIES="https://github.com/kilnfi/pgeth-monitoring"
