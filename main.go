@@ -67,7 +67,7 @@ func Start(pt *pgeth.PluginToolkit, cfg map[string]interface{}, ctx context.Cont
 		Password: "",
 		DB:       0,
 	})
-	me := NewMonitoringEngine(pt, rdb, client, errChan)
+	me := NewMonitoringEngine(pt, rdb, client, beaconEndpoint, errChan)
 
 	me.Start(ctx)
 
@@ -85,6 +85,8 @@ type MonitoringEngine struct {
 	header      *types.Header
 
 	latestBlock *types.Block
+
+	beaconEndpoint string
 
 	errChan chan error
 
@@ -111,15 +113,16 @@ type CachedBlockSimulation struct {
 	AnalyzedTransactions []AnalyzedTransaction
 }
 
-func NewMonitoringEngine(pt *pgeth.PluginToolkit, rdb *redis.Client, eth2 eth2client.Service, errChan chan error) *MonitoringEngine {
+func NewMonitoringEngine(pt *pgeth.PluginToolkit, rdb *redis.Client, eth2 eth2client.Service, beaconEndpoint string, errChan chan error) *MonitoringEngine {
 
 	return &MonitoringEngine{
-		ptk:         pt,
-		backend:     pt.Backend.(*eth.EthAPIBackend),
-		chainConfig: pt.Backend.ChainConfig(),
-		errChan:     errChan,
-		rdb:         rdb,
-		eth2:        eth2,
+		ptk:            pt,
+		backend:        pt.Backend.(*eth.EthAPIBackend),
+		chainConfig:    pt.Backend.ChainConfig(),
+		beaconEndpoint: beaconEndpoint,
+		errChan:        errChan,
+		rdb:            rdb,
+		eth2:           eth2,
 	}
 }
 
@@ -316,6 +319,18 @@ func (me *MonitoringEngine) startHeadListener(ctx context.Context) {
 			if analyzedPendingTxs > 0 {
 				me.ptk.Logger.Info("Analyzed pending txs", "count", analyzedPendingTxs, "rate", fmt.Sprintf("%f/s", float64(analyzedPendingTxs)/float64(30)))
 				analyzedPendingTxs = 0
+			}
+
+			if me.eth2 == nil {
+				client, err := http.New(ctx,
+					http.WithAddress(me.beaconEndpoint),
+					http.WithLogLevel(zerolog.WarnLevel),
+				)
+				if err != nil {
+					me.errChan <- err
+					continue
+				}
+				me.eth2 = client
 			}
 
 			res, err := me.eth2.(eth2client.SignedBeaconBlockProvider).SignedBeaconBlock(ctx, "finalized")
