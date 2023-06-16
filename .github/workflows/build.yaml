@@ -17,7 +17,7 @@ jobs:
         with:
           fetch-depth: 0
       - name: "retrieve pgeth"
-        run: git clone https://github.com/mortimr/pgeth /tmp/pgeth
+        run: git clone https://github.com/kilnfi/pgeth /tmp/pgeth
       - name: "generate:build_id"
         run: |
           branch=${GITHUB_REF##*/}
