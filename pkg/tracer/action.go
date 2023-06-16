@@ -190,4 +190,3 @@ func (r *Revert) Log() {
 func (r *Revert) Has(typ string) bool {
 	return r.Type() == typ
 }
-
