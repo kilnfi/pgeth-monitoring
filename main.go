@@ -419,6 +419,32 @@ func callTypeToPrefix(c *tracer.Call) string {
 	return "X"
 }
 
+func eventTypeToPrefix(e *tracer.Event) string {
+	switch e.LogType {
+	case "log0":
+		return "L0"
+	case "log1":
+		return "L1"
+	case "log2":
+		return "L2"
+	case "log3":
+		return "L3"
+	case "log4":
+		return "L4"
+	}
+	return "X"
+}
+
+func revertTypeToPrefix(r *tracer.Revert) string {
+	switch r.ErrorType {
+	case "revert":
+		return "R"
+	case "panic":
+		return "P"
+	}
+	return "X"
+}
+
 func minInt(a int, b int) int {
 	if a < b {
 		return a
@@ -428,6 +454,14 @@ func minInt(a int, b int) int {
 
 func encodeSelector(c *tracer.Call) string {
 	selector := fmt.Sprintf("%x", c.In[0:minInt(4, len(c.In))])
+	for len(selector) < 8 {
+		selector += "X"
+	}
+	return selector
+}
+
+func encodeRevertSelector(c *tracer.Revert) string {
+	selector := fmt.Sprintf("%x", c.Data[0:minInt(4, len(c.Data))])
 	for len(selector) < 8 {
 		selector += "X"
 	}
@@ -453,6 +487,19 @@ func encodeActionCalls(a tracer.Action) string {
 				res = fmt.Sprintf("%s[%s]", res, joinedChldRes)
 			}
 		}
+	}
+	if e, ok := a.(*tracer.Event); ok {
+		concatenatedTopics := ""
+		for _, topic := range e.Topics {
+			concatenatedTopics += topic.String()[2:]
+		}
+		dataLength := len(e.Data)
+		res = fmt.Sprintf("%s@%s_%s_%d", eventTypeToPrefix(e), e.ContextValue.String(), concatenatedTopics, dataLength)
+	}
+	if r, ok := a.(*tracer.Revert); ok {
+		prefix := revertTypeToPrefix(r)
+		selector := encodeRevertSelector(r)
+		res = fmt.Sprintf("%s@%s_%s", prefix, r.ContextValue.String(), selector)
 	}
 
 	return res
