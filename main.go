@@ -28,6 +28,10 @@ import (
 	"github.com/rs/zerolog"
 )
 
+func Version() {
+	fmt.Println("pgeth-monitoring: v0.0.1")
+}
+
 // plugin.so entrypoint
 func Start(pt *pgeth.PluginToolkit, cfg map[string]interface{}, ctx context.Context, errChan chan error) {
 	var redisEndpointRaw interface{}

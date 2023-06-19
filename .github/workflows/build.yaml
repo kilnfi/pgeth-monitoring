@@ -29,6 +29,9 @@ jobs:
       - name: "build the docker image with PLUGIN_REPOSITORIES=https://github.com/kilnfi/pgeth-monitoring"
         run: cd /tmp/pgeth && docker build .  -f Dockerfile.plugins --tag "ghcr.io/kilnfi/pgeth-monitoring:${{ env.BUILD_ID }}" --tag "ghcr.io/kilnfi/pgeth-monitoring:latest" --tag "ghcr.io/kilnfi/pgeth-monitoring:${GITHUB_SHA}" --build-arg PLUGIN_REPOSITORIES="https://github.com/kilnfi/pgeth-monitoring"
 
+      - name: "run version check to ensure plugin compatibility"
+        run: docker run --rm ghcr.io/kilnfi/pgeth-monitoring:${{ env.BUILD_ID }} version
+
       - name: "login to ghcr"
         uses: docker/login-action@v2
         with:
