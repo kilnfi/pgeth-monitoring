@@ -215,7 +215,8 @@ func (me *MonitoringEngine) analyze(ctx context.Context, block *types.Block, sco
 	}
 	analyzedTransactions := []AnalyzedTransaction{}
 	// We simulate all the transactions of the block
-	for _, tx := range block.Transactions() {
+	for idx, tx := range block.Transactions() {
+		state.SetTxContext(tx.Hash(), idx)
 		receipt, err := core.ApplyTransaction(me.chainConfig, me.backend.Ethereum().BlockChain(), &block.Header().Coinbase, gp, state, block.Header(), tx, &block.Header().GasUsed, vmConfig)
 		if err != nil {
 			me.errChan <- err
@@ -253,6 +254,7 @@ func (me *MonitoringEngine) analyzePending(ctx context.Context, txs []*types.Tra
 	for _, tx := range txs {
 		// we copy the state at the head
 		stateClone := me.state.Copy()
+		stateClone.SetTxContext(tx.Hash(), 0)
 		// we simulate the pending tx on top of it
 		receipt, err := core.ApplyTransaction(me.chainConfig, me.backend.Ethereum().BlockChain(), &me.header.Coinbase, gp, stateClone, me.header, tx, &me.header.GasUsed, vmConfig)
 		if err != nil {
