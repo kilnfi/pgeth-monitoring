@@ -428,15 +428,15 @@ func callTypeToPrefix(c *tracer.Call) string {
 func eventTypeToPrefix(e *tracer.Event) string {
 	switch e.LogType {
 	case "log0":
-		return "L0"
+		fallthrough
 	case "log1":
-		return "L1"
+		fallthrough
 	case "log2":
-		return "L2"
+		fallthrough
 	case "log3":
-		return "L3"
+		fallthrough
 	case "log4":
-		return "L4"
+		return "L"
 	}
 	return "X"
 }
