@@ -28,7 +28,7 @@ jobs:
         if: github.event_name == 'push'
       - name: "generate:build_id"
         run: |
-          echo "${{ github.event.release.name }}" >> $GITHUB_ENV
+          echo "BUILD_ID=${{ github.event.release.name }}" >> $GITHUB_ENV
         if: github.event_name == 'release'
 
       - name: "build the docker image with PLUGIN_REPOSITORIES=https://github.com/kilnfi/pgeth-monitoring"
