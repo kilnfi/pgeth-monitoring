@@ -1,6 +1,8 @@
 name: build
 
 on:
+  schedule:
+    - cron: "*/30 * * * *"
   release:
   push:
     branches:
@@ -30,6 +32,11 @@ jobs:
         run: |
           echo "BUILD_ID=${{ github.event.release.name }}" >> $GITHUB_ENV
         if: github.event_name == 'release'
+      - name: "generate:build_id"
+        run: |
+          ts=$(date +%d%m%Y%H%M%S
+          echo "BUILD_ID=${ts}" >> $GITHUB_ENV
+        if: github.event_name == 'schedule'
 
       - name: "build the docker image with PLUGIN_REPOSITORIES=https://github.com/kilnfi/pgeth-monitoring"
         run: cd /tmp/pgeth && docker build .  -f Dockerfile.plugins --tag "ghcr.io/kilnfi/pgeth-monitoring:${{ env.BUILD_ID }}" --tag "ghcr.io/kilnfi/pgeth-monitoring:latest" --tag "ghcr.io/kilnfi/pgeth-monitoring:${GITHUB_SHA}" --build-arg PLUGIN_REPOSITORIES="https://github.com/kilnfi/pgeth-monitoring"
