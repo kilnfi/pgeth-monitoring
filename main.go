@@ -14,7 +14,7 @@ import (
 
 	"github.com/attestantio/go-eth2-client/http"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/consensus/misc"
+	"github.com/ethereum/go-ethereum/consensus/misc/eip1559"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -149,7 +149,7 @@ func (me *MonitoringEngine) update(ctx context.Context, parent *types.Block) {
 		GasLimit:   parent.GasLimit(),
 		Time:       parent.Time() + 12,
 		Coinbase:   parent.Coinbase(),
-		BaseFee:    misc.CalcBaseFee(me.chainConfig, parent.Header()),
+		BaseFee:    eip1559.CalcBaseFee(me.chainConfig, parent.Header()),
 		Difficulty: parent.Difficulty(),
 	}
 	me.coinbase = parent.Coinbase()
