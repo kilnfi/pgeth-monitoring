@@ -110,8 +110,12 @@ func (m *MonitoringTracer) CaptureState(pc uint64, op vm.OpCode, gas, cost uint6
 	if op >= 160 && op <= 164 {
 		stack := scope.Stack.Data()
 		stackLen := len(stack)
-		offset := stack[stackLen-1].ToBig().Int64()
-		size := stack[stackLen-2].ToBig().Int64()
+		var offset int64 = 0
+		var size int64 = 0
+		if stackLen >= 2 {
+			offset = stack[stackLen-1].ToBig().Int64()
+			size = stack[stackLen-2].ToBig().Int64()
+		}
 		fetchSize := size
 		var data []byte = []byte{}
 		if int64(scope.Memory.Len()) < offset {
@@ -131,7 +135,9 @@ func (m *MonitoringTracer) CaptureState(pc uint64, op vm.OpCode, gas, cost uint6
 
 		topics := []common.Hash{}
 		for idx := 0; idx < int(op-160); idx++ {
-			topics = append(topics, stack[stackLen-3-idx].Bytes32())
+			if stackLen-3-idx >= 0 {
+				topics = append(topics, stack[stackLen-3-idx].Bytes32())
+			}
 		}
 
 		ctx, code := parentContextAndCode(m.Cursor)
@@ -155,8 +161,12 @@ func (m *MonitoringTracer) CaptureState(pc uint64, op vm.OpCode, gas, cost uint6
 		data := []byte{}
 		stack := scope.Stack.Data()
 		stackLen := len(stack)
-		offset := stack[stackLen-1].ToBig().Int64()
-		size := stack[stackLen-2].ToBig().Int64()
+		var offset int64 = 0
+		var size int64 = 0
+		if stackLen >= 2 {
+			offset = stack[stackLen-1].ToBig().Int64()
+			size = stack[stackLen-2].ToBig().Int64()
+		}
 		fetchSize := size
 		if int64(scope.Memory.Len()) < offset {
 			fetchSize = 0
