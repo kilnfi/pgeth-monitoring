@@ -2,7 +2,6 @@ package tracer
 
 import (
 	"fmt"
-	"math/big"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -36,7 +35,7 @@ type Call struct {
 
 	From   common.Address `json:"from,omitempty"`
 	To     common.Address `json:"to,omitempty"`
-	Value  *big.Int       `json:"value,omitempty"`
+	Value  string         `json:"value,omitempty"`
 	In     []byte         `json:"-"`
 	Out    []byte         `json:"-"`
 	InHex  string         `json:"in,omitempty"`

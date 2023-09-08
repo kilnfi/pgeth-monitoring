@@ -51,7 +51,7 @@ func (m *MonitoringTracer) CaptureStart(env *vm.EVM, from common.Address, to com
 		To:    to,
 		In:    copyInput,
 		InHex: "0x" + hex.EncodeToString(copyInput),
-		Value: usedValue,
+		Value: "0x" + usedValue.Text(16),
 	}
 	m.Cursor = m.Action
 }
@@ -92,7 +92,7 @@ func (m *MonitoringTracer) CaptureEnter(typ vm.OpCode, from common.Address, to c
 		To:               to,
 		In:               copyInput,
 		InHex:            "0x" + hex.EncodeToString(copyInput),
-		Value:            usedValue,
+		Value:            "0x" + usedValue.Text(16),
 	}
 	m.Cursor.AddChildren(call)
 	m.Cursor = call
