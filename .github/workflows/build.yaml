@@ -35,7 +35,7 @@ jobs:
       - name: "generate:build_id"
         run: |
           ts=$(date +%d%m%Y-%H%M%S)
-          echo "BUILD_ID=${ts}" >> $GITHUB_ENV
+          echo "BUILD_ID=auto-${ts}" >> $GITHUB_ENV
         if: github.event_name == 'schedule'
 
       - name: "build the docker image with PLUGIN_REPOSITORIES=https://github.com/kilnfi/pgeth-monitoring"
